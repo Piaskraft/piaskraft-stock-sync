@@ -12,6 +12,11 @@ const APPLY_CHANGES = process.env.APPLY_CHANGES === 'true';
 const MAX_UPDATES = parseInt(process.env.MAX_UPDATES || '10', 10);
 const GOOGLE_FALLBACK_QTY = parseInt(process.env.GOOGLE_FALLBACK_QTY || '2', 10);
 
+const ALLOWED_EANS = (process.env.ALLOWED_EANS || '')
+  .split(',')
+  .map((e) => e.trim())
+  .filter(Boolean);
+
 // klient do Presty (JSON – do list produktów i stanów)
 const presta = axios.create({
   baseURL: `${process.env.PRESTA_URL}/api`,
@@ -238,7 +243,7 @@ async function buildGoogleByEan() {
   };
 }
 
-// ===== AKTUALIZACJA XML W PREŚCIE (UŻYJEMY PÓŹNIEJ) =====
+// ===== AKTUALIZACJA XML W PREŚCIE =====
 
 function updateQuantityInXml(xml, newQty) {
   // najpierw wersja z CDATA
@@ -501,7 +506,18 @@ async function main() {
   });
 
   // TU wchodzą realne zmiany, jeśli APPLY_CHANGES=true
-  await applyChanges(toChange, stockByProductId);
+  let finalToChange = toChange;
+
+  if (ALLOWED_EANS.length > 0) {
+    finalToChange = toChange.filter((c) => ALLOWED_EANS.includes(c.ean));
+    console.log(
+      `\nFILTR EAN: ALLOWED_EANS=${ALLOWED_EANS.join(
+        ', '
+      )} -> do aktualizacji trafi ${finalToChange.length} pozycji.`
+    );
+  }
+
+  await applyChanges(finalToChange, stockByProductId);
 
   console.log('\n--- KONIEC SKRYPTU ---');
 }
